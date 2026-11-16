@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>היעדים שלנו</title><meta name="robots" content="noindex">
+<style>
+:root{--bg:#0d1420;--card:#151f2e;--line:#26344a;--fg:#eef2f7;--muted:#8fa0b6;--red:#ff3b3b;--gold:#e0a93b;--ok:#3ecf8e}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#1b2638,var(--bg) 60%);color:var(--fg);font-family:"Segoe UI",Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 40px;gap:22px}
+h1{margin:0;font-size:1.5rem;letter-spacing:.5px}.muted{color:var(--muted);font-size:.85rem}
+.ring{position:relative;width:min(340px,88vw);aspect-ratio:1;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:34px;
+background:radial-gradient(circle at 50% 40%,rgba(255,59,59,.16),var(--card) 70%);box-shadow:0 0 30px rgba(255,59,59,.5),inset 0 0 30px rgba(255,59,59,.2);animation:glow 2.4s ease-in-out infinite}
+.ring:before{content:"";position:absolute;inset:-9px;border-radius:50%;border:5px dashed var(--red);animation:spin 14s linear infinite}
+.ring:after{content:"";position:absolute;inset:4px;border-radius:50%;border:2px dotted rgba(255,59,59,.6);animation:spin 9s linear infinite reverse}
+.ring.done{animation:none;box-shadow:0 0 20px rgba(62,207,142,.4)}.ring.done:before,.ring.done:after{border-color:var(--ok);animation:none}
+.k{font-weight:800;color:var(--red)}.v{font-size:2.4rem;font-weight:900;color:var(--red);text-shadow:0 0 14px rgba(255,59,59,.5);line-height:1.1}
+.ring.done .k,.ring.done .v{color:var(--ok);text-shadow:none}
+.clock{display:flex;gap:6px;direction:ltr}.u{display:flex;flex-direction:column;align-items:center;min-width:52px;padding:4px 6px;border-radius:10px;background:#0f1724;border:1px solid var(--line)}
+.u b{font-size:1.4rem;font-variant-numeric:tabular-nums;color:var(--red)}.u small{font-size:.7rem;color:var(--muted)}
+.need{font-size:1rem}.need b{font-size:1.4rem;color:#fff}
+.card{width:min(560px,100%);background:var(--card);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:18px;padding:18px;text-align:center;display:flex;flex-direction:column;gap:8px}
+.card .v{color:var(--gold);text-shadow:none;font-size:2rem}
+.board{border-top-color:var(--red)}.br{display:grid;grid-template-columns:70px 1fr auto;align-items:center;gap:10px;padding:6px 0;text-align:right}
+.br b{font-size:1.05rem}.bar{height:10px;border-radius:999px;background:rgba(255,59,59,.15);overflow:hidden}.bar i{display:block;height:100%;background:var(--red);border-radius:999px;box-shadow:0 0 8px rgba(255,59,59,.6)}
+.br small{color:var(--muted)}.br .ok{color:var(--ok)}
+.pp{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.p{padding:6px 12px;border-radius:999px;background:#0f1724;border:1px solid var(--line)}.p b{color:#fff;font-size:1.1rem}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes glow{50%{box-shadow:0 0 50px rgba(255,59,59,.75),inset 0 0 36px rgba(255,59,59,.3)}}
+@media (prefers-reduced-motion:reduce){.ring,.ring:before,.ring:after{animation:none}}
+</style></head><body>
+<h1>היעדים שלנו</h1>
+<div class="ring" id="ring"><span class="k" id="dName">…</span><span class="v" id="dLeft"></span><span class="clock" id="clock"></span><span class="need" id="dNeed"></span><div class="pp" id="dPP"></div></div>
+<div class="card board" id="board" style="display:none"><span class="muted" id="bHead"></span><div id="bRows"></div></div>
+<div class="card"><span class="muted" id="yHead"></span><span class="v" id="yMiss"></span><span class="need" id="yNeed"></span><span class="muted" id="yPrice"></span></div>
+<span class="muted" id="upd"></span>
+<script>
+var G = null;
+function ils(n){return "₪" + Math.round(n).toLocaleString("he-IL");}
+function esc(s){return String(s == null ? "" : s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function per(n){var k=(G.partners||[]).length;return k?Math.ceil(n/k):n;}
+function chips(n){return (G.partners||[]).length>1?(G.partners||[]).map(function(p){return '<span class="p">'+esc(p)+': <b>'+per(n)+'</b></span>';}).join(""):"";}
+function pad(v){return (v<10?"0":"")+v;}
+function tick(){ if(!G)return; var el=document.getElementById("clock"), s=Math.floor((new Date(G.debt.deadline)-Date.now())/1000);
+  if(isNaN(s)){el.textContent="";return;} if(s<=0){el.textContent="הזמן עבר";return;}
+  var D=Math.floor(s/86400);s-=D*86400;var H=Math.floor(s/3600);s-=H*3600;var M=Math.floor(s/60);s-=M*60;
+  function u(v,l){return '<span class="u"><b>'+v+'</b><small>'+l+'</small></span>';}
+  el.innerHTML=u(D,"ימים")+u(pad(H),"שעות")+u(pad(M),"דקות")+u(pad(s),"שניות"); }
+function show(){ var d=G.debt,y=G.year;
+  document.getElementById("ring").className="ring"+(d.left>0?"":" done");
+  document.getElementById("dName").textContent=d.name;
+  document.getElementById("dLeft").textContent=d.left>0?ils(d.left):"הושלם ✓";
+  document.getElementById("dNeed").innerHTML=d.left>0&&d.course?'עוד <b>'+d.need+'</b> הרשמות ל'+esc(d.course)+'<br><span class="muted">כ-'+d.perWeek+' בשבוע · '+ils(d.price)+' להרשמה'+(d.regs?' · נרשמו כבר '+d.regs:'')+'</span>':"";
+  document.getElementById("dPP").innerHTML=d.left>0?chips(d.need):"";
+  var b=G.board, bEl=document.getElementById("board");
+  if(b&&b.rows&&b.rows.length&&b.quota){ bEl.style.display="";
+    document.getElementById("bHead").textContent="כל אחת צריכה להביא "+b.quota+" הרשמות ל"+d.course;
+    document.getElementById("bRows").innerHTML=b.rows.map(function(r){var p=Math.min(100,Math.round(r.done/b.quota*100));
+      return '<div class="br"><b>'+esc(r.name)+'</b><span class="bar"><i style="width:'+p+'%"></i></span><small>'+r.done+' מתוך '+b.quota+(r.left?' · נשאר '+r.left:' · <span class="ok">השלימה ✓</span>')+'</small></div>';}).join(""); }
+  else bEl.style.display="none";
+  document.getElementById("yHead").textContent="יעד סוף שנה · משכורות מלאות עד "+y.last;
+  document.getElementById("yMiss").textContent=y.missing>0?"חסר "+ils(y.missing):"היעד מכוסה ✓";
+  document.getElementById("yNeed").innerHTML=y.missing>0&&y.course?'עוד <b>'+y.need+'</b> הרשמות ל'+esc(y.course):"";
+  document.getElementById("yPrice").textContent=y.course?"הרשמה ל"+y.course+": "+ils(y.price)+" · יעד "+ils(y.target):"";
+  document.getElementById("upd").textContent=G.updated?"עודכן "+new Date(G.updated).toLocaleString("he-IL"):"";
+  tick(); }
+function load(){ fetch("goals.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){G=j;show();}).catch(function(){document.getElementById("upd").textContent="אין עדיין נתונים";}); }
+load(); setInterval(tick,1000); setInterval(load,60000);
+</script></body></html>
