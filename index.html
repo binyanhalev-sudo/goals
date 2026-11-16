@@ -20,6 +20,7 @@ background:radial-gradient(circle at 50% 40%,rgba(255,59,59,.16),var(--card) 70%
 .board{border-top-color:var(--red)}.br{display:grid;grid-template-columns:70px 1fr auto;align-items:center;gap:10px;padding:6px 0;text-align:right}
 .br b{font-size:1.05rem}.bar{height:10px;border-radius:999px;background:rgba(255,59,59,.15);overflow:hidden}.bar i{display:block;height:100%;background:var(--red);border-radius:999px;box-shadow:0 0 8px rgba(255,59,59,.6)}
 .br small{color:var(--muted)}.br .ok{color:var(--ok)}
+#yCourse{font-size:1rem;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:#0f1724;color:var(--fg)}
 .lock{border-top-color:var(--red);max-width:360px}.lock input[type=password]{font-size:1.1rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1724;color:var(--fg);text-align:center}
 .lock button{font-size:1rem;font-weight:700;padding:10px;border-radius:10px;border:0;background:var(--red);color:#fff;cursor:pointer}.err{color:#ff8a8a;min-height:1.1em;font-weight:600}
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes glow{50%{box-shadow:0 0 50px rgba(255,59,59,.75),inset 0 0 36px rgba(255,59,59,.3)}}
@@ -36,7 +37,7 @@ background:radial-gradient(circle at 50% 40%,rgba(255,59,59,.16),var(--card) 70%
 <div class="card" id="yCard" style="display:none"><span class="muted" id="yHead"></span><span class="v" id="yMiss"></span><span class="need" id="yNeed"></span><span class="muted" id="yPrice"></span></div>
 <span class="muted" id="upd"></span></div>
 <script>
-var G = null, PW = null, YW = null, Y = null;
+var G = null, PW = null, YW = null, Y = null, YC = null; try{ YC = localStorage.getItem("bh-goals-yc"); }catch(x){}
 function ub(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
 // the numbers come encrypted: AES-GCM with a key made from the password (PBKDF2-SHA256)
 function dec(box,pw){var e=new TextEncoder();return crypto.subtle.importKey("raw",e.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(k){return crypto.subtle.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:ub(box.s),iterations:box.n||150000},k,{name:"AES-GCM",length:256},false,["decrypt"]);}).then(function(key){return crypto.subtle.decrypt({name:"AES-GCM",iv:ub(box.i)},key,ub(box.c));}).then(function(buf){return JSON.parse(new TextDecoder().decode(buf));});}
@@ -55,8 +56,13 @@ function showYear(){ var y=Y, c=document.getElementById("yCard"), l=document.get
   l.style.display="none";c.style.display="";
   document.getElementById("yHead").textContent="יעד סוף שנה · משכורות מלאות עד "+y.last;
   document.getElementById("yMiss").textContent=y.missing>0?"חסר "+ils(y.missing):"היעד מכוסה ✓";
-  document.getElementById("yNeed").innerHTML=y.missing>0&&y.course?'עוד <b>'+y.need+'</b> הרשמות ל'+esc(y.course):"";
-  document.getElementById("yPrice").textContent=y.course?"הרשמה ל"+y.course+": "+ils(y.price)+" · יעד "+ils(y.target):""; }
+  // the course can be changed here: the number of registrations follows it (what each one leaves after VAT)
+  var list=y.courses&&y.courses.length?y.courses:[{name:y.course,price:y.price,net:y.need?y.missing/y.need:0}], cur=YC&&list.some(function(c){return c.name===YC;})?YC:y.course;
+  var co=list.filter(function(c){return c.name===cur;})[0]||list[0], need=co&&co.net>0?Math.ceil(y.missing/co.net-1e-9):0;
+  var sel='<select id="yCourse" aria-label="לפי איזה קורס לחשב">'+list.map(function(c){return '<option'+(c.name===co.name?' selected':'')+'>'+esc(c.name)+'</option>';}).join("")+'</select>';
+  document.getElementById("yNeed").innerHTML=y.missing>0&&co?'עוד <b>'+need+'</b> הרשמות ל'+sel:"";
+  document.getElementById("yPrice").textContent=co?"הרשמה ל"+co.name+": "+ils(co.price)+" · יעד "+ils(y.target):"";
+  var s=document.getElementById("yCourse"); if(s) s.onchange=function(){ YC=s.value; try{localStorage.setItem("bh-goals-yc",YC);}catch(x){} showYear(); }; }
 function show(){ var d=G.debt;
   document.getElementById("ring").className="ring"+(d.left>0?"":" done");
   document.getElementById("dName").textContent=d.name;
