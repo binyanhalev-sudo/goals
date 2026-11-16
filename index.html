@@ -48,10 +48,11 @@ function show(){ var d=G.debt,y=G.year;
   document.getElementById("dNeed").innerHTML=d.left>0&&d.course?'עוד <b>'+d.need+'</b> הרשמות ל'+esc(d.course)+'<br><span class="muted">כ-'+d.perWeek+' בשבוע · '+ils(d.price)+' להרשמה'+(d.regs?' · נרשמו כבר '+d.regs:'')+'</span>':"";
   document.getElementById("dPP").innerHTML=d.left>0?chips(d.need):"";
   var b=G.board, bEl=document.getElementById("board");
-  if(b&&b.rows&&b.rows.length&&b.quota){ bEl.style.display="";
-    document.getElementById("bHead").textContent="כל אחת צריכה להביא "+b.quota+" הרשמות ל"+d.course;
-    document.getElementById("bRows").innerHTML=b.rows.map(function(r){var p=Math.min(100,Math.round(r.done/b.quota*100));
-      return '<div class="br"><b>'+esc(r.name)+'</b><span class="bar"><i style="width:'+p+'%"></i></span><small>'+r.done+' מתוך '+b.quota+(r.left?' · נשאר '+r.left:' · <span class="ok">השלימה ✓</span>')+'</small></div>';}).join(""); }
+  if(b&&b.rows&&b.rows.length&&b.total){ bEl.style.display="";
+    var same=b.rows.every(function(r){return r.quota===b.rows[0].quota;});
+    document.getElementById("bHead").textContent=(same?"כל אחת צריכה להביא "+b.rows[0].quota:"ביחד "+b.total)+" הרשמות ל"+d.course;
+    document.getElementById("bRows").innerHTML=b.rows.map(function(r){var q=r.quota||0,p=q?Math.min(100,Math.round(r.done/q*100)):100;
+      return '<div class="br"><b>'+esc(r.name)+'</b><span class="bar"><i style="width:'+p+'%"></i></span><small>'+r.done+' מתוך '+q+(r.left?' · נשאר '+r.left:' · <span class="ok">השלימה ✓</span>')+'</small></div>';}).join(""); }
   else bEl.style.display="none";
   document.getElementById("yHead").textContent="יעד סוף שנה · משכורות מלאות עד "+y.last;
   document.getElementById("yMiss").textContent=y.missing>0?"חסר "+ils(y.missing):"היעד מכוסה ✓";
