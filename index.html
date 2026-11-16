@@ -20,33 +20,48 @@ background:radial-gradient(circle at 50% 40%,rgba(255,59,59,.16),var(--card) 70%
 .board{border-top-color:var(--red)}.br{display:grid;grid-template-columns:70px 1fr auto;align-items:center;gap:10px;padding:6px 0;text-align:right}
 .br b{font-size:1.05rem}.bar{height:10px;border-radius:999px;background:rgba(255,59,59,.15);overflow:hidden}.bar i{display:block;height:100%;background:var(--red);border-radius:999px;box-shadow:0 0 8px rgba(255,59,59,.6)}
 .br small{color:var(--muted)}.br .ok{color:var(--ok)}
-.pp{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.p{padding:6px 12px;border-radius:999px;background:#0f1724;border:1px solid var(--line)}.p b{color:#fff;font-size:1.1rem}
+.lock{border-top-color:var(--red);max-width:360px}.lock input[type=password]{font-size:1.1rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1724;color:var(--fg);text-align:center}
+.lock button{font-size:1rem;font-weight:700;padding:10px;border-radius:10px;border:0;background:var(--red);color:#fff;cursor:pointer}.err{color:#ff8a8a;min-height:1.1em;font-weight:600}
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes glow{50%{box-shadow:0 0 50px rgba(255,59,59,.75),inset 0 0 36px rgba(255,59,59,.3)}}
 @media (prefers-reduced-motion:reduce){.ring,.ring:before,.ring:after{animation:none}}
 </style></head><body>
 <h1>היעדים שלנו</h1>
-<div class="ring" id="ring"><span class="k" id="dName">…</span><span class="v" id="dLeft"></span><span class="clock" id="clock"></span><span class="need" id="dNeed"></span><div class="pp" id="dPP"></div></div>
+<form class="card lock" id="lockForm"><span class="k">🔒 הדף נעול</span><span class="muted">הקלידו את הסיסמה שקיבלתם</span>
+  <input id="pw" type="password" autocomplete="current-password" aria-label="סיסמה"><label class="muted"><input type="checkbox" id="pwRem"> לזכור בטלפון הזה</label>
+  <span class="err" id="pwErr" role="alert"></span><button type="submit">כניסה</button></form>
+<div id="main" style="display:none;width:100%;flex-direction:column;align-items:center;gap:22px">
+<div class="ring" id="ring"><span class="k" id="dName">…</span><span class="v" id="dLeft"></span><span class="clock" id="clock"></span><span class="need" id="dNeed"></span></div>
 <div class="card board" id="board" style="display:none"><span class="muted" id="bHead"></span><div id="bRows"></div></div>
-<div class="card"><span class="muted" id="yHead"></span><span class="v" id="yMiss"></span><span class="need" id="yNeed"></span><span class="muted" id="yPrice"></span></div>
-<span class="muted" id="upd"></span>
+<form class="card lock" id="yLock" style="display:none"><span class="muted">🔒 היעד השנתי · נפתח בסיסמה נפרדת</span><input id="yw" type="password" aria-label="סיסמה ליעד השנתי"><span class="err" id="ywErr" role="alert"></span><button type="submit">פתיחת היעד השנתי</button></form>
+<div class="card" id="yCard" style="display:none"><span class="muted" id="yHead"></span><span class="v" id="yMiss"></span><span class="need" id="yNeed"></span><span class="muted" id="yPrice"></span></div>
+<span class="muted" id="upd"></span></div>
 <script>
-var G = null;
+var G = null, PW = null, YW = null, Y = null;
+function ub(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+// the numbers come encrypted: AES-GCM with a key made from the password (PBKDF2-SHA256)
+function dec(box,pw){var e=new TextEncoder();return crypto.subtle.importKey("raw",e.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(k){return crypto.subtle.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:ub(box.s),iterations:box.n||150000},k,{name:"AES-GCM",length:256},false,["decrypt"]);}).then(function(key){return crypto.subtle.decrypt({name:"AES-GCM",iv:ub(box.i)},key,ub(box.c));}).then(function(buf){return JSON.parse(new TextDecoder().decode(buf));});}
+function getJ(){return fetch("goals.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();});}
 function ils(n){return "₪" + Math.round(n).toLocaleString("he-IL");}
 function esc(s){return String(s == null ? "" : s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
-function per(n){var k=(G.partners||[]).length;return k?Math.ceil(n/k):n;}
-function chips(n){return (G.partners||[]).length>1?(G.partners||[]).map(function(p){return '<span class="p">'+esc(p)+': <b>'+per(n)+'</b></span>';}).join(""):"";}
 function pad(v){return (v<10?"0":"")+v;}
 function tick(){ if(!G)return; var el=document.getElementById("clock"), s=Math.floor((new Date(G.debt.deadline)-Date.now())/1000);
   if(isNaN(s)){el.textContent="";return;} if(s<=0){el.textContent="הזמן עבר";return;}
   var D=Math.floor(s/86400);s-=D*86400;var H=Math.floor(s/3600);s-=H*3600;var M=Math.floor(s/60);s-=M*60;
   function u(v,l){return '<span class="u"><b>'+v+'</b><small>'+l+'</small></span>';}
   el.innerHTML=u(D,"ימים")+u(pad(H),"שעות")+u(pad(M),"דקות")+u(pad(s),"שניות"); }
-function show(){ var d=G.debt,y=G.year;
+function showYear(){ var y=Y, c=document.getElementById("yCard"), l=document.getElementById("yLock");
+  if(!G.year){c.style.display="none";l.style.display="none";return;}
+  if(!y){c.style.display="none";l.style.display="";return;}
+  l.style.display="none";c.style.display="";
+  document.getElementById("yHead").textContent="יעד סוף שנה · משכורות מלאות עד "+y.last;
+  document.getElementById("yMiss").textContent=y.missing>0?"חסר "+ils(y.missing):"היעד מכוסה ✓";
+  document.getElementById("yNeed").innerHTML=y.missing>0&&y.course?'עוד <b>'+y.need+'</b> הרשמות ל'+esc(y.course):"";
+  document.getElementById("yPrice").textContent=y.course?"הרשמה ל"+y.course+": "+ils(y.price)+" · יעד "+ils(y.target):""; }
+function show(){ var d=G.debt;
   document.getElementById("ring").className="ring"+(d.left>0?"":" done");
   document.getElementById("dName").textContent=d.name;
   document.getElementById("dLeft").textContent=d.left>0?ils(d.left):"הושלם ✓";
   document.getElementById("dNeed").innerHTML=d.left>0&&d.course?'עוד <b>'+d.need+'</b> הרשמות ל'+esc(d.course)+'<br><span class="muted">כ-'+d.perWeek+' בשבוע · '+ils(d.price)+' להרשמה'+(d.regs?' · נרשמו כבר '+d.regs:'')+'</span>':"";
-  document.getElementById("dPP").innerHTML=d.left>0?chips(d.need):"";
   var b=G.board, bEl=document.getElementById("board");
   if(b&&b.rows&&b.rows.length&&b.total){ bEl.style.display="";
     var same=b.rows.every(function(r){return r.quota===b.rows[0].quota;});
@@ -54,12 +69,17 @@ function show(){ var d=G.debt,y=G.year;
     document.getElementById("bRows").innerHTML=b.rows.map(function(r){var q=r.quota||0,p=q?Math.min(100,Math.round(r.done/q*100)):100;
       return '<div class="br"><b>'+esc(r.name)+'</b><span class="bar"><i style="width:'+p+'%"></i></span><small>'+r.done+' מתוך '+q+(r.left?' · נשאר '+r.left:' · <span class="ok">השלימה ✓</span>')+'</small></div>';}).join(""); }
   else bEl.style.display="none";
-  document.getElementById("yHead").textContent="יעד סוף שנה · משכורות מלאות עד "+y.last;
-  document.getElementById("yMiss").textContent=y.missing>0?"חסר "+ils(y.missing):"היעד מכוסה ✓";
-  document.getElementById("yNeed").innerHTML=y.missing>0&&y.course?'עוד <b>'+y.need+'</b> הרשמות ל'+esc(y.course):"";
-  document.getElementById("yPrice").textContent=y.course?"הרשמה ל"+y.course+": "+ils(y.price)+" · יעד "+ils(y.target):"";
   document.getElementById("upd").textContent=G.updated?"עודכן "+new Date(G.updated).toLocaleString("he-IL"):"";
-  tick(); }
-function load(){ fetch("goals.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){G=j;show();}).catch(function(){document.getElementById("upd").textContent="אין עדיין נתונים";}); }
-load(); setInterval(tick,1000); setInterval(load,60000);
+  tick(); showYear(); }
+// open with the page's password; every minute: the new numbers, opened with the same password
+function openWith(pw){ return getJ().then(function(j){ if(!j.enc) throw new Error("x"); return dec(j.enc,pw); }).then(function(inner){ G=inner; PW=pw;
+  document.getElementById("lockForm").style.display="none"; document.getElementById("main").style.display="flex"; show();
+  if(YW&&G.year) return dec(G.year,YW).then(function(y){Y=y;showYear();}).catch(function(){Y=null;showYear();}); }); }
+document.getElementById("lockForm").addEventListener("submit",function(e){ e.preventDefault(); var pw=document.getElementById("pw").value;
+  openWith(pw).then(function(){ try{ if(document.getElementById("pwRem").checked) localStorage.setItem("bh-goals-pw",pw); }catch(x){} })
+  .catch(function(){ document.getElementById("pwErr").textContent="הסיסמה לא נכונה"; document.getElementById("pw").value=""; }); });
+document.getElementById("yLock").addEventListener("submit",function(e){ e.preventDefault(); var yw=document.getElementById("yw").value;
+  dec(G.year,yw).then(function(y){ Y=y; YW=yw; showYear(); }).catch(function(){ document.getElementById("ywErr").textContent="הסיסמה לא נכונה"; document.getElementById("yw").value=""; }); });
+try{ var s=localStorage.getItem("bh-goals-pw"); if(s) openWith(s).catch(function(){ try{localStorage.removeItem("bh-goals-pw");}catch(x){} }); }catch(x){}
+setInterval(tick,1000); setInterval(function(){ if(PW) openWith(PW).catch(function(){}); },60000);
 </script></body></html>
